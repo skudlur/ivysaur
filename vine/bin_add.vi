@@ -1,0 +1,8 @@
+pub fn main(&io: &IO) {
+  let op1 = 15;
+  let op2 = 12;
+  let out = 0;
+
+  out = op1 + op2;
+  io.println("result: {out}");
+}

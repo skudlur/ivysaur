@@ -1,0 +1,130 @@
+#+title: Messing around with Vine and Ivy
+
+* What I am trying to do
+
+This experiment is my way of understand Vine, Ivy - the intermediate representation and the IVM.
+
+** Example Code
+
+#+begin_src
+// bin_add.vi
+
+pub fn main(&io: &IO) {
+  let op1 = 15;
+  let op2 = 12;
+  let out = 0;
+
+  out = op1 + op2;
+  io:println("result: {out}");
+}
+#+end_src
+
+** Commands
+
+*** Running the code
+
+**** `vine run bin_add.vi`
+
+Output:
+
+#+begin_src
+result: 27
+Interactions
+  Total                  280
+  Annihilate             135
+  Commute                  0
+  Copy                    21
+  Erase                   15
+  Graft                   37
+  Extrinsic               72
+Memory
+  Heap                   816 B
+  Allocated            5_824 B
+  Freed                5_824 B
+Performance
+  Time                     0 ms
+  Speed            5_529_225 IPS
+#+end_src
+
+*** Building the targets for the IR
+
+`ivysaur/vine/ivy_ir.txt`     --> for target type "none"
+`ivysaur/vine/ivy_ir_ivm.txt` --> for target type "ivm"
+
+The intention is to understand the none type IR (and maybe even compare the two) to model the Bluespec module.
+
+* The IR format
+
+An Ivy program is a list of named global nets. Each net describes a wiring diagram, a graph of nodes connected by wires. Reduction happens by rewriting that graph.
+
+** Nets and equations
+
+#+begin_src
+iv:main {
+  ^ = vi:tuple(0 1)
+  vi:graft[:bin_add::main] = vi:fn(vi:ref(0 1) vi:tuple)
+}
+#+end_src
+
+~:main~ is the net name. Every net has one principal port (~^~). Reduction happens when two principal ports are connected. That connected pair is called an /active pair/, and it's the unit of computation.
+
+Everything else in the block is an equation. ~lhs = rhs~ means /connection/. The two trees on either side are wired together, principal-port to principal-port. That's a potential active pair.
+
+~vi:graft[:name]~ invokes another net by name and that expands the named net's definition into the graph in place. Like inlining a function call.
+
+** Wire variables
+
+Bare integers (~0~, ~1~, ~2~...) are anonymous wire names. Each integer appears /exactly twice/ in a net which name the two endpoints of one wire. One producer, one consumer.
+
+#+begin_src
+:root::numeric::N32::add {
+  ^ = vi:fn(vi:ext#2[vi:n32:add](0 1) 0 1)
+}
+#+end_src
+
+Here ~0~ appears twice: once as an input to ~vi:ext#2~ and once as an auxiliary of ~vi:fn~. They are the same wire. Same for ~1~. This is linearity made explicit in the syntax. If a value needs to be used twice, an explicit ~vi:dup~ node must appear.
+
+** Node types
+
+| Node                  | Role                                          |
+|-----------------------+-----------------------------------------------|
+| ~vi:fn(r a b...)~     | Lambda/application. ~r~ = principal, rest aux |
+| ~vi:ext#2[op](a b)~   | Extrinsic op. Calls host primitive ~op~       |
+| ~vi:n32#V~            | Integer literal. Leaf node, carries value V   |
+| ~vi:eraser~           | Discard. Annihilates whatever it's wired to   |
+| ~vi:dup(a b)~         | Fanout. Copies one value to two consumers     |
+| ~vi:graft[:name]~     | Net invocation. Expands named net in place    |
+
+* Tracing op1 + op2
+
+The Vine source ~out = op1 + op2~ (15 + 12) compiles to this in ~:bin_add::main~:
+
+#+begin_src
+vi:graft[:root::numeric::N32::add] = vi:fn(vi:n32#15 vi:n32#12 2)
+#+end_src
+
+And the add net itself is defined as:
+
+#+begin_src
+:root::numeric::N32::add {
+  ^ = vi:fn(vi:ext#2[vi:n32:add](0 1) 0 1)
+}
+#+end_src
+
+When ~vi:graft~ expands, the add net's principal ~vi:fn~ meets the caller's ~vi:fn~ forming an active pair. The two ~fn~ nodes annihilate (as counted in the stats). Ports zip: wire ~0~ gets literal 15, wire ~1~ gets literal 12. Now ~vi:ext#2[vi:n32:add](15, 12)~ is ready. The extrinsic fires (also counted in the stats). Result 27 flows out on wire ~2~, which connects to the string conversion path for ~io.println~.
+
+* Why this maps to Bluespec
+
+The key insight is that Bluespec's atomic guarded rules are structurally identical to interaction net rewrite rules.
+
+| Ivy concept            | Bluespec concept                              |
+|------------------------+-----------------------------------------------|
+| Net block              | ~module~                                      |
+| Wire variable N        | ~Reg#(Token) wire_N~                          |
+| Active pair            | rule guard: both principal ports match types  |
+| Rewrite                | rule body: atomic writes to result wires      |
+| ~vi:ext#2[n32:add]~    | ~let result = wire_a + wire_b~ in rule body   |
+| ~vi:eraser~            | ~noAction~ — mark wire consumed               |
+| Non-overlapping pairs  | Non-conflicting rules fire in parallel        |
+
+An active pair is detected when two wire registers carry matching principal port types. The rule body performs the rewrite atomically, exactly as interaction net semantics require.

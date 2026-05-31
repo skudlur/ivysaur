@@ -1,0 +1,141 @@
+
+iv:main {
+  ^ = ivm:x(0 1)
+  ivm:graft[:bin_add::main] = ivm:x(ivm:x(0 1) ivm:eraser)
+}
+
+:bin_add::main {
+  ^ = ivm:x(ivm:x(0 1) ivm:eraser)
+  ivm:graft[:root::numeric::N32::add] = ivm:x(ivm:n32#15 ivm:x(ivm:n32#12 2))
+  ivm:graft[:root::numeric::N32::to_string::cast] = ivm:x(2 ivm:x(3 ivm:x(4 5)))
+  ivm:n32#8 = ivm:ext:merge[vi:n32:add](3 6)
+  ivm:graft[:root::IO::println] = ivm:x(
+    ivm:x(0 1)
+    ivm:x(ivm:x(6 ivm:x(ivm:x(ivm:n32#114 ivm:x(ivm:n32#101 ivm:x(ivm:n32#115 ivm:x(ivm:n32#117 ivm:x(ivm:n32#108 ivm:x(ivm:n32#116 ivm:x(ivm:n32#58 ivm:x(ivm:n32#32 4)))))))) 5)) 7)
+  )
+  ivm:graft[:root::util::erase::drop] = ivm:x(7 ivm:eraser)
+  ivm:graft[:root::util::erase::drop] = ivm:x(ivm:n32 ivm:eraser)
+  ivm:eraser = ivm:eraser
+}
+
+:root::util::erase::drop {
+  ^ = ivm:eraser
+}
+
+:root::numeric::N32::add {
+  ^ = ivm:x(
+    ivm:ext:merge[vi:n32:add](0 1)
+    ivm:x(0 1)
+  )
+}
+
+:root::data::List::Iter::advance#2 {
+  ^ = ivm:x(
+    ivm:ext:merge[vi:n32:sub](ivm:n32#1 0)
+    ivm:x(
+      ivm:x(1 2)
+      ivm:x(3 ivm:x(ivm:n32#1 ivm:x(1 ivm:x(0 ivm:x(2 3)))))
+    )
+  )
+}
+
+:root::data::List::Iter::advance#3 {
+  ^ = ivm:x(ivm:eraser ivm:x(ivm:eraser ivm:x(ivm:eraser ivm:x(ivm:n32 ivm:eraser))))
+}
+
+:root::IO::print {
+  ^ = ivm:x(0 ivm:x(ivm:x(
+    ivm:y(1 ivm:ext:merge[vi:n32:ne](ivm:n32 ivm:ext:merge[ivm:branch](
+      ivm:branch[:root::data::List::Iter::advance#3, :root::data::List::Iter::advance#2]
+      ivm:x(1 ivm:x(2 ivm:x(3 ivm:x(ivm:ext:merge[ivm:branch](
+        ivm:branch[:root::IO::print#4, :root::IO::print#5]
+        ivm:x(0 4)
+      ) 4))))
+    )))
+    ivm:x(2 3)
+  ) ivm:eraser))
+}
+
+:root::IO::print#4 {
+  ^ = ivm:x(ivm:x(0 0) ivm:eraser)
+}
+
+:root::IO::print#5 {
+  ^ = ivm:x(
+    ivm:x(ivm:ext:merge[root:io:print_char](0 1) 2)
+    ivm:x(0 ivm:x(
+      ivm:y(3 ivm:ext:merge[vi:n32:ne](ivm:n32 ivm:ext:merge[ivm:branch](
+        ivm:branch[:root::data::List::Iter::advance#3, :root::data::List::Iter::advance#2]
+        ivm:x(3 ivm:x(4 ivm:x(5 ivm:x(ivm:ext:merge[ivm:branch](
+          ivm:branch[:root::IO::print#4, :root::IO::print#5]
+          ivm:x(ivm:x(1 2) 6)
+        ) 6))))
+      )))
+      ivm:x(4 5)
+    ))
+  )
+}
+
+:root::IO::print_char {
+  ^ = ivm:x(
+    ivm:x(ivm:ext:merge[root:io:print_char](0 1) 1)
+    ivm:x(0 ivm:eraser)
+  )
+}
+
+:root::numeric::N32::to_string::cast {
+  ^ = ivm:x(ivm:y(0 ivm:ext:merge[vi:n32:ne](ivm:n32 ivm:ext:merge[ivm:branch](
+    ivm:branch[:root::numeric::N32::to_string::cast#3, :root::numeric::N32::to_string::cast#2]
+    ivm:x(0 1)
+  ))) 1)
+}
+
+:root::numeric::N32::to_string::cast#2 {
+  ^ = ivm:x(ivm:y(0 ivm:ext:merge[vi:n32:ne](ivm:n32 ivm:ext:merge[ivm:branch](
+    ivm:branch[:root::numeric::N32::to_string::cast#6, :root::numeric::N32::to_string::cast#5]
+    ivm:x(0 ivm:x(ivm:x(ivm:n32 ivm:x(1 1)) 2))
+  ))) 2)
+}
+
+:root::numeric::N32::to_string::cast#3 {
+  ^ = ivm:x(ivm:eraser ivm:x(ivm:n32#1 ivm:x(ivm:x(ivm:n32#48 0) 0)))
+}
+
+:root::numeric::N32::to_string::cast#5 {
+  ^ = ivm:x(
+    ivm:y(
+      ivm:ext:merge[vi:n32:div](ivm:n32#10 ivm:y(0 ivm:ext:merge[vi:n32:ne](ivm:n32 ivm:ext:merge[ivm:branch](
+        ivm:branch[:root::numeric::N32::to_string::cast#6, :root::numeric::N32::to_string::cast#5]
+        ivm:x(0 ivm:x(ivm:x(1 ivm:x(ivm:x(2 3) 4)) 5))
+      ))))
+      ivm:ext:merge[vi:n32:rem](ivm:n32#10 ivm:ext:merge:swap[vi:n32:add](ivm:n32#48 2))
+    )
+    ivm:x(ivm:x(
+      ivm:ext:merge:swap[vi:n32:add](ivm:n32#1 1)
+      ivm:x(3 4)
+    ) 5)
+  )
+}
+
+:root::numeric::N32::to_string::cast#6 {
+  ^ = ivm:x(ivm:eraser ivm:x(0 0))
+}
+
+:root::IO::println {
+  ^ = ivm:x(
+    ivm:x(0 1)
+    ivm:x(2 ivm:eraser)
+  )
+  ivm:graft[:root::IO::print] = ivm:x(
+    ivm:x(0 3)
+    ivm:x(2 4)
+  )
+  ivm:graft[:root::util::erase::drop] = ivm:x(4 ivm:eraser)
+  ivm:graft[:root::IO::print_char] = ivm:x(
+    ivm:x(3 1)
+    ivm:x(ivm:n32#10 5)
+  )
+  ivm:graft[:root::util::erase::drop] = ivm:x(5 ivm:eraser)
+  ivm:eraser = ivm:eraser
+}
+

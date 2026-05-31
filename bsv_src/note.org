@@ -1,0 +1,136 @@
+#+title: Mapping Interaction Nets to Bluespec
+
+* The core insight
+
+Bluespec's atomic guarded rules map directly onto interaction net rewrite rules. The semantics are structurally identical. No encoding required, no scheduler to write.
+
+| Ivy concept           | Bluespec concept                             |
+|-----------------------+----------------------------------------------|
+| Net block             | ~module~                                     |
+| Wire variable N       | ~Reg#(Token) wireN~                          |
+| Active pair           | rule guard: principal port tags match        |
+| Rewrite               | rule body: atomic writes to result wires     |
+| ~vi:ext#2[n32:add]~   | ~let result = a + b~ inside the rule body    |
+| ~vi:eraser~           | ~noAction~ — mark wire consumed              |
+| Non-overlapping pairs | Non-conflicting rules fire in parallel       |
+
+An active pair is detected when two wire registers carry matching principal port types. That is the guard. The rule body performs the rewrite atomically, exactly as interaction net semantics require.
+
+* The proof: N32::add in Bluespec
+
+The Ivy rule:
+
+#+begin_src
+:root::numeric::N32::add {
+  ^ = vi:fn(vi:ext#2[vi:n32:add](0 1) 0 1)
+}
+#+end_src
+
+Becomes this in Bluespec:
+
+#+begin_src bsv
+rule rl_n32_add (wire0.tag == TAG_N32 &&
+                 wire1.tag == TAG_N32 &&
+                 !reduced);
+    let a   = wire0.val;
+    let b   = wire1.val;
+    let sum = a + b;
+    result <= mkN32(sum);  // rewrite: result wire now carries vi:n32#27
+    wire0  <= invalid();   // operands consumed — linearity enforced
+    wire1  <= invalid();
+    reduced <= True;
+endrule
+#+end_src
+
+The guard is the active pair detector. The body is the rewrite. The invalidation of wire0 and wire1 enforces linearity. Values are used exactly once, matching Vine's ownership model.
+
+Running this in Bluesim for ~vi:n32#15 + vi:n32#12~:
+
+#+begin_src
+[cycle  0] INIT    wire0=N32(15)  wire1=N32(12)  result=INVALID
+[cycle  0] GUARD   active pair detected: wire0=TAG_N32, wire1=TAG_N32
+[cycle  0] FIRE    rl_n32_add: vi:ext#2[vi:n32:add](15, 12)
+[cycle  0] REWRITE wire0=INVALID  wire1=INVALID  result=N32(27)
+[cycle  1] DONE    result = 27
+PASS: 15 + 12 = 27
+#+end_src
+
+One rule. One cycle. Correct result.
+
+* Why not SystemVerilog
+
+In SystemVerilog, implementing the same reduction would require:
+
+- An explicit state machine to sequence reduction steps
+- Arbitration logic to decide which active pair fires when multiple are ready
+- A hand-written scheduler to detect non-overlapping pairs and allow parallel firing
+- Hazard detection between concurrent rewrites touching the same wires
+
+All of that logic exists in Bluespec already, generated automatically from the rule guards. The Bluespec compiler schedules non-conflicting rules to fire in parallel by construction. You write the semantics and bsc handles the microarchitecture.
+
+* The IVM comparison
+
+The Rust IVM takes a different approach to the same problem. Comparing the two compiler targets:
+
+~--target none~ (the ~vi:~ form) preserves type information:
+
+#+begin_src
+:root::numeric::N32::add {
+  ^ = vi:fn(vi:ext#2[vi:n32:add](0 1) 0 1)
+}
+#+end_src
+
+~--target ivm~ (the ~ivm:~ form) collapses everything to two combinators:
+
+#+begin_src
+:root::numeric::N32::add {
+  ^ = ivm:x(ivm:ext:merge[vi:n32:add](0 1) ivm:x(0 1))
+}
+#+end_src
+
+The IVM throws away type information — ~vi:fn~, ~vi:tuple~, ~vi:ref~ all become ~ivm:x~ — because a uniform two-combinator system is easier to execute in software with a tight inner loop.
+
+In Bluespec the opposite is true. Keeping the typed ~vi:~ form means each node type gets its own rule, and non-conflicting rules fire in parallel automatically. Hardware parallelism comes for free from the rule scheduler. Flattening to ~ivm:x~ in hardware would throw away the very information the scheduler needs to parallelize safely.
+
+* Towards a BSV-specific IR
+
+This suggests defining a normal form specifically for the BSV reduction core. Something in between the ~vi:~ form and not the ~ivm:~ form.
+
+The pipeline would look like this:
+
+#+begin_src
+Vine source
+    ↓  vine compiler
+vi: IR            ← typed, human-readable
+    ↓  gen.py (lowering pass)
+BSV normal form   ← optimised for the reduction engine
+    ↓  BSV loader
+Heap initialised
+    ↓  IntNets reduction core
+Result
+#+end_src
+
+What the BSV normal form would strip out:
+
+- Pure wiring nodes (~vi:tuple = vi:tuple~ terminators, ~vi:ref~ threading) that annihilate immediately and contribute no computation
+- Structural sugar that exists for the compiler's benefit, not the runtime's
+
+What it would keep:
+
+- Node type tags. Needed for rule guards and parallel scheduling
+- Extrinsic operations. These are the actual computation
+- Wire connectivity. Needed to build the heap
+
+Rather than a separate generator, this suggests introducing a BSV target directly into the Ivy compiler alongside ~--target none~ and ~--target ivm~, a ~--target bsv~ that emits the normal form the reduction core expects. The reduction rules never change, they are for the CPU. Only the heap contents change per program, and the compiler handles the lowering.
+
+* What a full reduction core would look like
+
+The current ~IntNets.bsv~ has the graph hardcoded. Generalising it to take any Ivy program as input requires these:
+
+- A *heap model*: a register file indexed by node ID, holding one ~Token~ per entry. This replaces the handful of named wire registers.
+- An *active pair queue*: a FIFO of ~(NodeId, NodeId)~ pairs. When two nodes are connected principal-to-principal, the pair is enqueued. The rule guard simplifies to "queue is non-empty."
+- A *loader interface*: a method that accepts a stream of ~(NodeId, Token, connections)~ tuples and writes the initial graph into the heap before reduction starts.
+
+The reduction rules stay exactly the same in structure. They just operate on heap addresses instead of named registers.
+
+The interesting hardware property falls out naturally: two rules that touch disjoint heap addresses have no conflict, so the Bluespec scheduler fires them in the same cycle. That is the native parallelism of interaction nets, expressed directly in hardware with no additional logic.
