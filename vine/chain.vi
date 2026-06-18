@@ -1,0 +1,13 @@
+pub fn main(&io: &IO) {
+  let x = add3(5);
+  let y = double(x);
+  io.println("result: {y}");
+}
+
+fn add3(n: N32) -> N32 {
+  n + 3
+}
+
+fn double(n: N32) -> N32 {
+  n * 2
+}

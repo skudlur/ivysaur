@@ -1,0 +1,4 @@
+pub fn main(&io: &IO) {
+  let x = 6 * 7;
+  io.println("{x}");
+}
