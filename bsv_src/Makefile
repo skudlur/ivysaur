@@ -10,7 +10,7 @@ BSC        = bsc
 TOP        = mkTestIntNets
 VDIR       = verilog_out
 SIM_OUT    = sim_out
-BSC_FLAGS  = -verilog -u -g $(TOP)
+BSC_FLAGS  = -verilog -u -g $(TOP) +RTS -K64M -RTS
 
 # Verilator flags
 VL         = verilator

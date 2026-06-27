@@ -120,9 +120,14 @@ typedef union tagged {
     struct { NodeId slot; PortRef tgt; } UpdatePort1;
     struct { NodeId slot; PortRef tgt; } UpdatePort2;
     struct { NodeId slot; PortRef tgt; } UpdatePort3;
+    struct { NodeId slot; Bit#(32) val; PortRef back; } WriteN32;
+    // AllocFn: write a new TAG_FN node to slot
+    struct { NodeId slot; PortRef p0; PortRef p1; } AllocFn;
+    // AllocDup: write a new TAG_DUP node to slot
+    struct { NodeId slot; PortRef p0; PortRef p1; PortRef p2; } AllocDup;
 } PendingOp deriving (Bits);
 
-// fn+fn worst case: 8 port updates + 2 frees = 10
+// fn+dup: 2 AllocDup + 2 AllocFn + 4 UpdatePort + 2 Free = 10
 typedef 10 MAX_OPS;
 
 // ---------------------------------------------------------------------------

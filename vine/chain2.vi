@@ -1,0 +1,5 @@
+pub fn main(&io: &IO) {
+  let x = 5 + 3;
+  let y = x * 2;
+  io.println("{y}");
+}

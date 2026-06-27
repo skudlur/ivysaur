@@ -1,0 +1,7 @@
+fn double_use(n: N32) -> N32 {
+  n + n
+}
+pub fn main(&io: &IO) {
+  let x = double_use(5);
+  io.println("{x}");
+}
