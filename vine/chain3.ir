@@ -1,0 +1,105 @@
+
+iv:main {
+  ^ = vi:tuple(0 1)
+  vi:graft[:chain3::main] = vi:fn(vi:ref(0 1) vi:tuple)
+}
+
+:chain3::main {
+  ^ = vi:fn(vi:ref(0 1) vi:tuple)
+  vi:graft[:root::numeric::N32::add] = vi:fn(vi:n32#5 vi:n32#3 2)
+  vi:graft[:root::numeric::N32::mul] = vi:fn(2 vi:n32#2 3)
+  vi:graft[:root::numeric::N32::sub] = vi:fn(3 vi:n32#1 4)
+  vi:graft[:root::numeric::N32::to_string::cast] = vi:fn(4 vi:tuple(5 6 7))
+  vi:graft[:root::IO::println] = vi:fn(
+    vi:ref(0 1)
+    vi:tuple(5 6 7)
+    8
+  )
+  vi:graft[:root::util::erase::drop] = vi:fn(8 vi:tuple)
+  vi:tuple = vi:tuple
+}
+
+:root::util::erase::drop {
+  ^ = vi:fn(vi:eraser vi:tuple)
+}
+
+:root::numeric::N32::sub {
+  ^ = vi:fn(vi:ext#2[vi:n32:sub](0 1) 0 1)
+}
+
+:root::numeric::N32::add {
+  ^ = vi:fn(vi:ext#2[vi:n32:add](0 1) 0 1)
+}
+
+:root::numeric::N32::mul {
+  ^ = vi:fn(vi:ext#2[vi:n32:mul](0 1) 0 1)
+}
+
+:root::data::List::Iter::advance#2 {
+  ^ = vi:interface(
+    vi:ext#2[vi:n32:sub](vi:n32#1 0)
+    vi:tuple(1 2)
+    3
+    vi:enum:variant#1[vi:enum#2](vi:tuple(1 vi:tuple(0 2 3)))
+  )
+}
+
+:root::data::List::Iter::advance#3 {
+  ^ = vi:interface(vi:eraser vi:tuple vi:tuple vi:enum:variant[vi:enum#2](vi:tuple))
+}
+
+:root::IO::print {
+  ^ = vi:fn(0 vi:tuple(vi:dup(1 vi:ext#2[vi:n32:ne](vi:n32 vi:bool:if[:root::data::List::Iter::advance#2, :root::data::List::Iter::advance#3](vi:interface(1 2 3 vi:enum:match[vi:enum#2, :root::IO::print#4, :root::IO::print#5](vi:interface(0)))))) 2 3) vi:tuple)
+}
+
+:root::IO::print#4 {
+  ^0 = vi:interface(vi:ref(0 0))
+  ^1 = vi:tuple
+}
+
+:root::IO::print#5 {
+  ^0 = vi:interface(vi:ref(vi:ext#2[root:io:print_char](0 1) 2))
+  ^1 = vi:tuple(0 vi:tuple(vi:dup(3 vi:ext#2[vi:n32:ne](vi:n32 vi:bool:if[:root::data::List::Iter::advance#2, :root::data::List::Iter::advance#3](vi:interface(3 4 5 vi:enum:match[vi:enum#2, :root::IO::print#4, :root::IO::print#5](vi:interface(vi:ref(1 2))))))) 4 5))
+}
+
+:root::IO::print_char {
+  ^ = vi:fn(vi:ref(vi:ext#2[root:io:print_char](0 1) 1) 0 vi:tuple)
+}
+
+:root::numeric::N32::to_string::cast {
+  ^ = vi:fn(vi:dup(0 vi:ext#2[vi:n32:ne](vi:n32 vi:bool:if[:root::numeric::N32::to_string::cast#2, :root::numeric::N32::to_string::cast#3](vi:interface(0 1)))) 1)
+}
+
+:root::numeric::N32::to_string::cast#2 {
+  ^ = vi:interface(vi:dup(0 vi:ext#2[vi:n32:ne](vi:n32 vi:bool:if[:root::numeric::N32::to_string::cast#5, :root::numeric::N32::to_string::cast#6](vi:interface(0 vi:ref(vi:tuple(vi:n32 1 1) 2))))) 2)
+}
+
+:root::numeric::N32::to_string::cast#3 {
+  ^ = vi:interface(vi:eraser vi:tuple(vi:n32#1 vi:tuple(vi:n32#48 0) 0))
+}
+
+:root::numeric::N32::to_string::cast#5 {
+  ^ = vi:interface(
+    vi:dup(
+      vi:ext#2[vi:n32:div](vi:n32#10 vi:dup(0 vi:ext#2[vi:n32:ne](vi:n32 vi:bool:if[:root::numeric::N32::to_string::cast#5, :root::numeric::N32::to_string::cast#6](vi:interface(0 vi:ref(vi:tuple(1 vi:tuple(2 3) 4) 5))))))
+      vi:ext#2[vi:n32:rem](vi:n32#10 6)
+    )
+    vi:ref(vi:tuple(7 3 4) 5)
+  )
+  vi:n32#48 = vi:ext#2[vi:n32:add](6 2)
+  vi:n32#1 = vi:ext#2[vi:n32:add](7 1)
+}
+
+:root::numeric::N32::to_string::cast#6 {
+  ^ = vi:interface(vi:eraser vi:ref(0 0))
+}
+
+:root::IO::println {
+  ^ = vi:fn(vi:ref(0 1) 2 vi:tuple)
+  vi:graft[:root::IO::print] = vi:fn(vi:ref(0 3) 2 4)
+  vi:graft[:root::util::erase::drop] = vi:fn(4 vi:tuple)
+  vi:graft[:root::IO::print_char] = vi:fn(vi:ref(3 1) vi:n32#10 5)
+  vi:graft[:root::util::erase::drop] = vi:fn(5 vi:tuple)
+  vi:tuple = vi:tuple
+}
+

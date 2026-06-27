@@ -74,8 +74,19 @@ module mkIntNets(IntNets_IFC);
     Reg#(Bit#(4)) opCount <- mkReg(0);
     Reg#(Bit#(4)) opIdx   <- mkReg(0);
 
-    // Result for detect: the NodeId written by exec
-    // and the NodeId of the node it's now connected to
+    // Result pairs for detect — up to 3 new pairs per rewrite
+    // fn+fn can create 3 new connections (port0, port1, port2 zips)
+    // fn+ext creates 1, n32+dup creates 1, wire prop creates 1
+    Vector#(3, Reg#(NodeId)) detectNodes <-
+        replicateM(mkReg(0));
+    Vector#(3, Reg#(NodeId)) detectConnects <-
+        replicateM(mkReg(0));
+    Reg#(Bit#(2)) detectCount <- mkReg(0);  // how many pairs to check
+    Reg#(Bit#(2)) detectIdx   <- mkReg(0);  // current pair being checked
+    Reg#(Bool)    detectFoundAny <- mkReg(False); // enqueued anything this sweep
+
+    // Keep single resultNode/resultConnect for backward compat
+    // They now alias detectNodes[0]/detectConnects[0]
     Reg#(NodeId) resultNode    <- mkReg(0);
     Reg#(NodeId) resultConnect <- mkReg(0);
 
@@ -202,6 +213,11 @@ module mkIntNets(IntNets_IFC);
             // its consumer is right.port0.node
             resultNode    <= resSlot;
             resultConnect <= heap[resSlot].port0.node;
+            detectNodes[0]    <= resSlot;
+            detectConnects[0] <= heap[resSlot].port0.node;
+            detectCount    <= 1;
+            detectIdx      <= 0;
+            detectFoundAny <= False;
 
             interCount <= interCount + 1;
             $display("exec arith %0d op %0d result %0d slot %0d",
@@ -244,6 +260,17 @@ module mkIntNets(IntNets_IFC);
             opCount <= 10;
             opIdx   <= 0;
 
+            // Save all three zipped port connections for multi-pair detect
+            detectNodes[0]    <= l0.node;
+            detectConnects[0] <= r0.node;
+            detectNodes[1]    <= l1.node;
+            detectConnects[1] <= r1.node;
+            detectNodes[2]    <= l2.node;
+            detectConnects[2] <= r2.node;
+            detectCount    <= 3;
+            detectIdx      <= 0;
+            detectFoundAny <= False;
+            // Keep backward compat
             resultNode    <= l0.node;
             resultConnect <= r0.node;
 
@@ -289,6 +316,11 @@ module mkIntNets(IntNets_IFC);
 
             resultNode    <= copy1Slot;
             resultConnect <= heap[copy1Slot].port0.node;
+            detectNodes[0]    <= copy1Slot;
+            detectConnects[0] <= heap[copy1Slot].port0.node;
+            detectCount    <= 1;
+            detectIdx      <= 0;
+            detectFoundAny <= False;
 
             interCount <= interCount + 1;
             $display("exec dup n32 val %0d copy1 %0d copy2 %0d",
@@ -318,6 +350,11 @@ module mkIntNets(IntNets_IFC);
 
             resultNode    <= copy1Slot;
             resultConnect <= heap[copy1Slot].port0.node;
+            detectNodes[0]    <= copy1Slot;
+            detectConnects[0] <= heap[copy1Slot].port0.node;
+            detectCount    <= 1;
+            detectIdx      <= 0;
+            detectFoundAny <= False;
 
             interCount <= interCount + 1;
             $display("exec dup n32 val %0d copy1 %0d copy2 %0d",
@@ -350,10 +387,14 @@ module mkIntNets(IntNets_IFC);
             // so detect can enqueue (fn, ext) as a new active pair
             let ownerFnSlot = right.port0.node;
             let ownerFn     = heap[right.port0.node];
-            // fn.port3 stores the ext partner (set by gen.py)
             let extSlot     = ownerFn.port3.node;
             resultNode    <= ownerFnSlot;
             resultConnect <= extSlot;
+            detectNodes[0]    <= ownerFnSlot;
+            detectConnects[0] <= extSlot;
+            detectCount    <= 1;
+            detectIdx      <= 0;
+            detectFoundAny <= False;
             interCount    <= interCount + 1;
             $display("exec wire prop n32 val %0d to slot %0d owner fn %0d ext %0d",
                      val, pair.right, ownerFnSlot, extSlot);
@@ -377,6 +418,11 @@ module mkIntNets(IntNets_IFC);
             let extSlot     = ownerFn.port3.node;
             resultNode    <= ownerFnSlot;
             resultConnect <= extSlot;
+            detectNodes[0]    <= ownerFnSlot;
+            detectConnects[0] <= extSlot;
+            detectCount    <= 1;
+            detectIdx      <= 0;
+            detectFoundAny <= False;
             interCount    <= interCount + 1;
             $display("exec wire prop n32 val %0d to slot %0d owner fn %0d ext %0d",
                      val, pair.left, ownerFnSlot, extSlot);
@@ -458,6 +504,13 @@ module mkIntNets(IntNets_IFC);
             // Detect: new_fn1 and new_fn2 may form active pairs with D and E
             resultNode    <= s2;
             resultConnect <= d.node;
+            detectNodes[0]    <= s2;
+            detectConnects[0] <= d.node;
+            detectNodes[1]    <= s3;
+            detectConnects[1] <= e.node;
+            detectCount    <= 2;
+            detectIdx      <= 0;
+            detectFoundAny <= False;
 
             interCount <= interCount + 1;
             $display("exec fn dup commute fn %0d dup %0d new %0d %0d %0d %0d",
@@ -466,18 +519,24 @@ module mkIntNets(IntNets_IFC);
         end else if (left.tag == TAG_ERASER || right.tag == TAG_ERASER) begin
             ops[0] <= tagged Free pair.left;
             ops[1] <= tagged Free pair.right;
-            opCount       <= 2;
-            opIdx         <= 0;
-            resultNode    <= 0;
-            resultConnect <= 0;
-            interCount    <= interCount + 1;
+            opCount        <= 2;
+            opIdx          <= 0;
+            resultNode     <= 0;
+            resultConnect  <= 0;
+            detectCount    <= 0;
+            detectIdx      <= 0;
+            detectFoundAny <= False;
+            interCount     <= interCount + 1;
             $display("exec erase %0d %0d", pair.left, pair.right);
 
         end else begin
-            opCount       <= 0;
-            opIdx         <= 0;
-            resultNode    <= 0;
-            resultConnect <= 0;
+            opCount        <= 0;
+            opIdx          <= 0;
+            resultNode     <= 0;
+            resultConnect  <= 0;
+            detectCount    <= 0;
+            detectIdx      <= 0;
+            detectFoundAny <= False;
             $display("exec unhandled ltag %0d rtag %0d",
                      pack(left.tag), pack(right.tag));
         end
@@ -589,54 +648,58 @@ module mkIntNets(IntNets_IFC);
     //   AND tags form a reducible pair
     // -----------------------------------------------------------------------
     rule rl_detect (state == STATE_DETECT);
-        Bool enqueued = False;
 
-        if (resultNode != 0 && resultConnect != 0) begin
-            let a = heap[resultNode];
-            let b = heap[resultConnect];
+        if (detectIdx < detectCount) begin
+            NodeId rn = detectNodes[detectIdx];
+            NodeId rc = detectConnects[detectIdx];
 
-            Bool facingBack = (b.port0.node == resultNode);
-            Bool notSelf    = (resultNode != resultConnect);
-            Bool bothValid  = (a.valid && b.valid);
-            Bool wireProp   = (a.valid && !b.valid && a.tag == TAG_N32);
+            if (rn != 0 && rc != 0) begin
+                let a = heap[rn];
+                let b = heap[rc];
 
-            Bool fnExtReady = False;
-            if (a.tag == TAG_FN && b.tag == TAG_EXT && bothValid) begin
-                let opA = heap[a.port1.node];
-                let opB = heap[a.port2.node];
-                fnExtReady = (opA.valid && opA.tag == TAG_N32 &&
-                              opB.valid && opB.tag == TAG_N32);
+                Bool facingBack = (b.port0.node == rn);
+                Bool notSelf    = (rn != rc);
+                Bool bothValid  = (a.valid && b.valid);
+                Bool wireProp   = (a.valid && !b.valid && a.tag == TAG_N32);
+
+                Bool fnExtReady = False;
+                if (a.tag == TAG_FN && b.tag == TAG_EXT && bothValid) begin
+                    let opA = heap[a.port1.node];
+                    let opB = heap[a.port2.node];
+                    fnExtReady = (opA.valid && opA.tag == TAG_N32 &&
+                                  opB.valid && opB.tag == TAG_N32);
+                end
+
+                if (notSelf && (
+                    (facingBack && bothValid) ||
+                    wireProp ||
+                    fnExtReady
+                )) begin
+                    queue.enq(ActivePair { left: rn, right: rc });
+                    detectFoundAny <= True;
+                    $display("detect new pair %0d %0d tags %0d %0d",
+                             rn, rc, pack(a.tag), pack(b.tag));
+                end else begin
+                    $display("detect no pair rn %0d rc %0d fb %0d bv %0d wp %0d fe %0d",
+                             rn, rc,
+                             facingBack ? 1 : 0,
+                             bothValid  ? 1 : 0,
+                             wireProp   ? 1 : 0,
+                             fnExtReady ? 1 : 0);
+                end
             end
 
-            if (notSelf && (
-                (facingBack && bothValid) ||
-                (wireProp) ||
-                fnExtReady
-            )) begin
-                queue.enq(ActivePair { left: resultNode, right: resultConnect });
-                enqueued = True;
-                $display("detect new pair %0d %0d tags %0d %0d",
-                         resultNode, resultConnect,
-                         pack(a.tag), pack(b.tag));
+            detectIdx <= detectIdx + 1;
+
+        end else begin
+            // Sweep complete
+            if (detectFoundAny || !queue.isEmpty()) begin
+                state          <= STATE_FETCH;
+                detectFoundAny <= False;
             end else begin
-                $display("detect no pair rn %0d rc %0d fb %0d bv %0d wp %0d fe %0d",
-                         resultNode, resultConnect,
-                         facingBack ? 1 : 0,
-                         bothValid  ? 1 : 0,
-                         wireProp   ? 1 : 0,
-                         fnExtReady ? 1 : 0);
+                state <= STATE_DONE;
+                $display("done interactions %0d", interCount);
             end
-        end else begin
-            $display("detect skip");
-        end
-
-        // If we just enqueued a pair OR queue already had pairs, go to FETCH
-        // Otherwise we are done
-        if (enqueued || !queue.isEmpty()) begin
-            state <= STATE_FETCH;
-        end else begin
-            state <= STATE_DONE;
-            $display("done interactions %0d", interCount);
         end
     endrule
 
