@@ -314,17 +314,24 @@ module mkIntNets(IntNets_IFC);
             opCount <= 3;
             opIdx   <= 0;
 
-            resultNode    <= copy1Slot;
-            resultConnect <= heap[copy1Slot].port0.node;
-            detectNodes[0]    <= copy1Slot;
-            detectConnects[0] <= heap[copy1Slot].port0.node;
+            // After duplication, both copies land in a downstream fn's
+            // operand slots. The copy's port0 points back to that fn;
+            // the fn's port3 points to its ext partner. Enqueue that
+            // (fn, ext) pair so the downstream op fires once both
+            // operands are ready (checked by fnExtReady in detect).
+            let dFnOwner = heap[copy1Slot].port0.node;
+            let dExtPart = heap[dFnOwner].port3.node;
+            resultNode    <= dFnOwner;
+            resultConnect <= dExtPart;
+            detectNodes[0]    <= dFnOwner;
+            detectConnects[0] <= dExtPart;
             detectCount    <= 1;
             detectIdx      <= 0;
             detectFoundAny <= False;
 
             interCount <= interCount + 1;
-            $display("exec dup n32 val %0d copy1 %0d copy2 %0d",
-                     val, copy1Slot, copy2Slot);
+            $display("exec dup n32 val %0d copy1 %0d copy2 %0d fn %0d ext %0d",
+                     val, copy1Slot, copy2Slot, dFnOwner, dExtPart);
 
         end else if (left.tag == TAG_DUP && right.tag == TAG_N32) begin
             let val = right.val;
@@ -348,17 +355,19 @@ module mkIntNets(IntNets_IFC);
             opCount <= 3;
             opIdx   <= 0;
 
-            resultNode    <= copy1Slot;
-            resultConnect <= heap[copy1Slot].port0.node;
-            detectNodes[0]    <= copy1Slot;
-            detectConnects[0] <= heap[copy1Slot].port0.node;
+            let dFnOwner = heap[copy1Slot].port0.node;
+            let dExtPart = heap[dFnOwner].port3.node;
+            resultNode    <= dFnOwner;
+            resultConnect <= dExtPart;
+            detectNodes[0]    <= dFnOwner;
+            detectConnects[0] <= dExtPart;
             detectCount    <= 1;
             detectIdx      <= 0;
             detectFoundAny <= False;
 
             interCount <= interCount + 1;
-            $display("exec dup n32 val %0d copy1 %0d copy2 %0d",
-                     val, copy1Slot, copy2Slot);
+            $display("exec dup n32 val %0d copy1 %0d copy2 %0d fn %0d ext %0d",
+                     val, copy1Slot, copy2Slot, dFnOwner, dExtPart);
         // ------------------------------------------------------------------
         // N32 + INVALID: wire propagation
         // When an N32 value faces an INVALID wire slot, propagate

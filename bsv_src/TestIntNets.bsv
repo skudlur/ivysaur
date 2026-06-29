@@ -20,82 +20,49 @@ module mkTestIntNets(Empty);
         cycle <= cycle + 1;
     endrule
 
-    rule rl_load (loadIdx < 17);
+    rule rl_load (loadIdx < 10);
         case (loadIdx)
-            0: dut.load(0, Node { tag: TAG_FN, val: 0,
-                    port0: PortRef { node: 2, port: pPRINCIPAL() },
-                    port1: PortRef { node: 3, port: pPRINCIPAL() },
-                    port2: PortRef { node: 4, port: pPRINCIPAL() },
-                    port3: PortRef { node: 1, port: pPRINCIPAL() }, valid: True });
-            1: dut.load(1, Node { tag: TAG_EXT,
-                    val: zeroExtend(pack(EXT_ADD)),
-                    port0: PortRef { node: 0, port: pPRINCIPAL() },
-                    port1: PortRef { node: 3, port: pAUX0() },
-                    port2: PortRef { node: 4, port: pAUX1() },
-                    port3: nullRef(), valid: True });
-            2: dut.load(2, Node { tag: TAG_INVALID, val: 0,
-                    port0: PortRef { node: 8, port: pPRINCIPAL() },
-                    port1: nullRef(), port2: nullRef(),
-                    port3: nullRef(), valid: False });
-            3: dut.load(3, Node { tag: TAG_N32, val: 5,
-                    port0: PortRef { node: 0, port: pAUX0() },
-                    port1: nullRef(), port2: nullRef(),
-                    port3: nullRef(), valid: True });
-            4: dut.load(4, Node { tag: TAG_N32, val: 3,
-                    port0: PortRef { node: 0, port: pAUX1() },
-                    port1: nullRef(), port2: nullRef(),
-                    port3: nullRef(), valid: True });
-            5: dut.load(5, Node { tag: TAG_FN, val: 0,
-                    port0: PortRef { node: 7, port: pPRINCIPAL() },
-                    port1: PortRef { node: 8, port: pPRINCIPAL() },
-                    port2: PortRef { node: 9, port: pPRINCIPAL() },
-                    port3: PortRef { node: 6, port: pPRINCIPAL() }, valid: True });
-            6: dut.load(6, Node { tag: TAG_EXT,
-                    val: zeroExtend(pack(EXT_MUL)),
-                    port0: PortRef { node: 5, port: pPRINCIPAL() },
-                    port1: PortRef { node: 8, port: pAUX0() },
-                    port2: PortRef { node: 9, port: pAUX1() },
-                    port3: nullRef(), valid: True });
-            7: dut.load(7, Node { tag: TAG_INVALID, val: 0,
-                    port0: PortRef { node: 13, port: pPRINCIPAL() },
-                    port1: nullRef(), port2: nullRef(),
-                    port3: nullRef(), valid: False });
-            8: dut.load(8, Node { tag: TAG_INVALID, val: 0,
-                    port0: PortRef { node: 5, port: pAUX0() },
-                    port1: nullRef(), port2: nullRef(),
-                    port3: nullRef(), valid: False });
-            9: dut.load(9, Node { tag: TAG_N32, val: 2,
-                    port0: PortRef { node: 5, port: pAUX1() },
-                    port1: nullRef(), port2: nullRef(),
-                    port3: nullRef(), valid: True });
-            10: dut.load(10, Node { tag: TAG_FN, val: 0,
-                    port0: PortRef { node: 12, port: pPRINCIPAL() },
-                    port1: PortRef { node: 13, port: pPRINCIPAL() },
-                    port2: PortRef { node: 14, port: pPRINCIPAL() },
-                    port3: PortRef { node: 11, port: pPRINCIPAL() }, valid: True });
-            11: dut.load(11, Node { tag: TAG_EXT,
-                    val: zeroExtend(pack(EXT_SUB)),
-                    port0: PortRef { node: 10, port: pPRINCIPAL() },
-                    port1: PortRef { node: 13, port: pAUX0() },
-                    port2: PortRef { node: 14, port: pAUX1() },
-                    port3: nullRef(), valid: True });
-            12: dut.load(12, Node { tag: TAG_INVALID, val: 0,
+            0: dut.load(0, Node { tag: TAG_INVALID, val: 0,
                     port0: nullRef(),
                     port1: nullRef(), port2: nullRef(),
                     port3: nullRef(), valid: False });
-            13: dut.load(13, Node { tag: TAG_INVALID, val: 0,
-                    port0: PortRef { node: 10, port: pAUX0() },
+            1: dut.load(1, Node { tag: TAG_FN, val: 0,
+                    port0: PortRef { node: 3, port: pPRINCIPAL() },
+                    port1: PortRef { node: 4, port: pPRINCIPAL() },
+                    port2: PortRef { node: 5, port: pPRINCIPAL() },
+                    port3: PortRef { node: 2, port: pPRINCIPAL() }, valid: True });
+            2: dut.load(2, Node { tag: TAG_EXT,
+                    val: zeroExtend(pack(EXT_ADD)),
+                    port0: PortRef { node: 1, port: pPRINCIPAL() },
+                    port1: PortRef { node: 4, port: pAUX0() },
+                    port2: PortRef { node: 5, port: pAUX1() },
+                    port3: nullRef(), valid: True });
+            3: dut.load(3, Node { tag: TAG_INVALID, val: 0,
+                    port0: nullRef(),
                     port1: nullRef(), port2: nullRef(),
                     port3: nullRef(), valid: False });
-            14: dut.load(14, Node { tag: TAG_N32, val: 1,
-                    port0: PortRef { node: 10, port: pAUX1() },
+            4: dut.load(4, Node { tag: TAG_INVALID, val: 0,
+                    port0: PortRef { node: 1, port: pAUX0() },
+                    port1: nullRef(), port2: nullRef(),
+                    port3: nullRef(), valid: False });
+            5: dut.load(5, Node { tag: TAG_INVALID, val: 0,
+                    port0: PortRef { node: 1, port: pAUX1() },
+                    port1: nullRef(), port2: nullRef(),
+                    port3: nullRef(), valid: False });
+            6: dut.load(6, Node { tag: TAG_N32, val: 5,
+                    port0: PortRef { node: 7, port: pPRINCIPAL() },
                     port1: nullRef(), port2: nullRef(),
                     port3: nullRef(), valid: True });
-            15: begin
-                dut.enqPair(ActivePair { left: 0, right: 1 });
-                $display("enq pair 0 1");
+            7: dut.load(7, Node { tag: TAG_DUP, val: 0,
+                    port0: PortRef { node: 6, port: pPRINCIPAL() },
+                    port1: PortRef { node: 4, port: pAUX0() },
+                    port2: PortRef { node: 5, port: pAUX1() },
+                    port3: nullRef(), valid: True });
+            8: begin
+                dut.enqPair(ActivePair { left: 6, right: 7 });
+                $display("enq pair 6 7");
             end
-            16: begin
+            9: begin
                 dut.startReduction();
                 $display("starting reduction");
             end
@@ -108,7 +75,7 @@ module mkTestIntNets(Empty);
     Reg#(Node) resultReg    <- mkReg(invalidNode());
 
     rule rl_read (dut.done() && !checkPending);
-        resultReg    <= dut.readNode(12);
+        resultReg    <= dut.readNode(3);
         checkPending <= True;
     endrule
 
@@ -116,7 +83,7 @@ module mkTestIntNets(Empty);
         let result = resultReg;
         $display("DONE cycle %0d interactions %0d",
                  cycle, dut.interactions());
-        $display("result slot 12 tag %0d val %0d",
+        $display("result slot 3 tag %0d val %0d",
                  pack(result.tag), result.val);
         if (result.tag == TAG_N32)
             $display("RESULT %0d", result.val);

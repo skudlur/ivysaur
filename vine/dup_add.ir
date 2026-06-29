@@ -1,0 +1,12 @@
+// dup_add.ir — hand-authored (vine not available in this environment).
+// Models the fan-out core of `let x = 5; let y = x + x;`
+// The value 5 is duplicated by a vi:dup onto the add's two operand wires.
+
+:dup_add::main {
+  vi:graft[:root::numeric::N32::add] = vi:fn(0 1 2)
+  vi:dup(0 1) = vi:n32#5
+}
+
+:root::numeric::N32::add {
+  ^ = vi:fn(vi:ext#2[vi:n32:add](0 1) 0 1)
+}

@@ -90,6 +90,19 @@ def parse_graft_line(line):
         return None
     return (m.group(1), parse_fn_args(m.group(2)))
 
+def parse_dup_line(line):
+    """
+    Parse a fan-out equation of the form:
+        vi:dup(<w0> <w1>) = vi:n32#<V>
+    meaning: literal V is duplicated onto wires w0 and w1 (each of which
+    is an operand of a downstream op). Returns (w0, w1, V) or None.
+    """
+    m = re.match(r'\s*vi:dup\((\d+)\s+(\d+)\)\s*=\s*vi:n32#(\d+)\s*$',
+                 line.rstrip())
+    if not m:
+        return None
+    return (m.group(1), m.group(2), int(m.group(3)))
+
 # ---------------------------------------------------------------------------
 # Graph nodes
 # ---------------------------------------------------------------------------
@@ -116,10 +129,11 @@ def build_graph(ir_text):
     Wire table: wire_id -> [(slot, port_idx), ...]
     Only registers the TWO meaningful endpoints per wire.
     """
-    nodes    = []          # list of Node
-    wires    = {}          # wire_id -> [(slot, port_idx)]
-    pairs    = []          # active pairs (fn_slot, ext_slot)
-    slot_ctr = [0]
+    nodes     = []         # list of Node
+    wires     = {}         # wire_id -> [(slot, port_idx)]
+    pairs     = []         # arithmetic pairs (fn, ext, res, a, b)
+    dup_pairs = []         # fan-out pairs (lit_slot, dup_slot)
+    slot_ctr  = [0]
 
     def alloc():
         s = slot_ctr[0]
@@ -131,6 +145,10 @@ def build_graph(ir_text):
         if wire_id not in wires:
             wires[wire_id] = []
         wires[wire_id].append((slot, port_idx))
+
+    # Reserve slot 0 as the null node. nullRef() == {node:0,port:0} and the
+    # engine treats node 0 as "no connection", so no real node may live there.
+    nodes.append(Node(slot=alloc(), tag='TAG_INVALID', val=0, valid=False))
 
     lines = ir_text.split('\n')
 
@@ -202,7 +220,35 @@ def build_graph(ir_text):
               f"fn={fn_slot} ext={ext_slot} res={res_slot} a={a_slot} b={b_slot}",
               file=sys.stderr)
 
-    return nodes, wires, pairs, slot_ctr[0]
+    # Second pass: fan-out (vi:dup) equations.
+    # A dup duplicates a literal onto two wires, each an operand of an op
+    # parsed above. We register the dup's two outputs as the second
+    # endpoints of those operand wires so resolve() links them.
+    for line in lines:
+        dup = parse_dup_line(line)
+        if not dup:
+            continue
+        w0, w1, val = dup
+
+        lit_slot = alloc()   # the literal being duplicated
+        dup_slot = alloc()   # the dup node
+
+        # literal <-> dup principal-to-principal (the active pair)
+        nodes.append(Node(slot=lit_slot, tag='TAG_N32', val=val, valid=True,
+                          port0=portref(dup_slot, pPRINCIPAL)))
+        nodes.append(Node(slot=dup_slot, tag='TAG_DUP', val=0, valid=True,
+                          port0=portref(lit_slot, pPRINCIPAL)))
+
+        # dup's two outputs are the second endpoints of wires w0, w1
+        reg_wire(w0, dup_slot, pAUX0)
+        reg_wire(w1, dup_slot, pAUX1)
+
+        dup_pairs.append((lit_slot, dup_slot))
+
+        print(f"[gen] DUP n32#{val} -> wires {w0},{w1} "
+              f"lit={lit_slot} dup={dup_slot}", file=sys.stderr)
+
+    return nodes, wires, pairs, dup_pairs, slot_ctr[0]
 
 # ---------------------------------------------------------------------------
 # Wire resolution — set PortRefs on all nodes
@@ -319,13 +365,19 @@ def node_to_bsv(n):
                 f"                    port1: {n.port1},\n"
                 f"                    port2: {n.port2},\n"
                 f"                    port3: nullRef(), valid: True }});")
+    elif tag == 'TAG_DUP':
+        return (f"dut.load({n.slot}, Node {{ tag: TAG_DUP, val: 0,\n"
+                f"                    port0: {n.port0},\n"
+                f"                    port1: {n.port1},\n"
+                f"                    port2: {n.port2},\n"
+                f"                    port3: nullRef(), valid: True }});")
     else:  # TAG_INVALID
         return (f"dut.load({n.slot}, Node {{ tag: TAG_INVALID, val: 0,\n"
                 f"                    port0: {n.port0},\n"
                 f"                    port1: nullRef(), port2: nullRef(),\n"
                 f"                    port3: nullRef(), valid: False }});")
 
-def generate_bsv(nodes, pairs, total_slots):
+def generate_bsv(nodes, pairs, dup_pairs, total_slots):
     sorted_nodes = sorted(nodes, key=lambda n: n.slot)
 
     load_cases = '\n'.join(
@@ -336,25 +388,29 @@ def generate_bsv(nodes, pairs, total_slots):
     enq_start = total_slots
     slot_to_node = {n.slot: n for n in nodes}
 
-    # Only enqueue pairs where BOTH operands are literals
-    # Wire operands need to receive their value via propagation first
-    literal_pairs = []
+    # Initial active pairs to enqueue:
+    #   - arithmetic ops where BOTH operands are literals (fire immediately)
+    #   - fan-out ops: (literal, dup) — the dup fires, then the engine
+    #     enqueues the downstream op once both copies have landed.
+    # Wire operands receive their value via propagation first.
+    init_pairs = []
     for (fn, ext, res, a, b) in pairs:
         a_node = slot_to_node.get(a)
         b_node = slot_to_node.get(b)
         if (a_node and a_node.tag == 'TAG_N32' and
             b_node and b_node.tag == 'TAG_N32'):
-            literal_pairs.append((fn, ext))
+            init_pairs.append((fn, ext))
+    init_pairs.extend(dup_pairs)
 
     enq_cases = '\n'.join(
         f"            {enq_start + i}: begin\n"
-        f"                dut.enqPair(ActivePair {{ left: {fn}, right: {ext} }});\n"
-        f"                $display(\"enq pair {fn} {ext}\");\n"
+        f"                dut.enqPair(ActivePair {{ left: {l}, right: {r} }});\n"
+        f"                $display(\"enq pair {l} {r}\");\n"
         f"            end"
-        for i, (fn, ext) in enumerate(literal_pairs)
+        for i, (l, r) in enumerate(init_pairs)
     )
 
-    start_idx  = enq_start + len(literal_pairs)
+    start_idx  = enq_start + len(init_pairs)
     total_load = start_idx + 1
 
     last_res = pairs[-1][2]
@@ -435,7 +491,7 @@ def main():
     with open(args[0]) as f:
         ir_text = f.read()
 
-    nodes, wires, pairs, total_slots = build_graph(ir_text)
+    nodes, wires, pairs, dup_pairs, total_slots = build_graph(ir_text)
 
     if not pairs:
         print("[gen] no arithmetic operations found", file=sys.stderr)
@@ -443,8 +499,8 @@ def main():
 
     resolve(nodes, wires, pairs)
 
-    print(f"[gen] {len(pairs)} op(s), {len(nodes)} nodes, "
-          f"{len(wires)} wires", file=sys.stderr)
+    print(f"[gen] {len(pairs)} op(s), {len(dup_pairs)} dup(s), "
+          f"{len(nodes)} nodes, {len(wires)} wires", file=sys.stderr)
 
     if show_only:
         print("\nWire table:")
@@ -459,7 +515,7 @@ def main():
             print(f"  fn={fn} ext={ext} res={res} a={a} b={b}")
         return
 
-    bsv = generate_bsv(nodes, pairs, total_slots)
+    bsv = generate_bsv(nodes, pairs, dup_pairs, total_slots)
     print(bsv)
 
 if __name__ == '__main__':
