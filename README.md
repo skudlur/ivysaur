@@ -7,7 +7,7 @@ interaction-net programs and reduces them on a reduction core written in
 > **Bluespec's guarded atomic rules are interaction-net rewrite rules.**
 > An active pair is a rule guard; a rewrite is a rule body; linearity is the
 > invalidation of consumed slots. You write the *semantics* and the bsc
-> scheduler hands you the *microarchitecture* — including parallelism — for free.
+> scheduler hands you the *microarchitecture*, including parallelism, for free.
 
 This repo is a personal study built to understand the Vine/Ivy/IVM stack from
 the hardware side.
@@ -34,9 +34,6 @@ bsv_src/              the hardware
   sim/                Verilator harnesses
   Makefile            build + run
 ```
-
-See [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) for the full design and the
-Ivy→BSV mapping.
 
 ---
 
